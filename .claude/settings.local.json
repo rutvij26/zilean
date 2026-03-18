@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/rut26/OneDrive/Desktop/Repos/**)",
+      "Bash(npm create:*)",
+      "Bash(printf \"y\\\\nn\\\\n\")",
+      "Bash(printf 'y\\\\nn\\\\n')",
+      "Bash(npx @quick-start/create-electron zilean --template react-ts)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(CI=true npx @quick-start/create-electron zilean --template react-ts)",
+      "Bash(echo \"Done: $?\")",
+      "Bash(npm test:*)"
+    ]
+  }
+}
