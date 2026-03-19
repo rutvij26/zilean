@@ -4,6 +4,7 @@
   "description": "Zilean — Real-time LoL AI Coach",
   "main": "./out/main/index.js",
   "author": "rutvij26",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "homepage": ".",
   "scripts": {
     "format": "prettier --write .",
