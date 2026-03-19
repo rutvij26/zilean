@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/rutvij26/zilean/compare/v1.0.0...v1.1.0) (2026-03-19)
+
+
+### Features
+
+* objective timers, buff tracker, dead time, ability hint ([89c2ea8](https://github.com/rutvij26/zilean/commit/89c2ea80cc53d212dc2b1a544dfcc3012b77918b))
+
 # 1.0.0 (2026-03-19)
 
 
