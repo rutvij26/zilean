@@ -167,4 +167,13 @@ export interface AppSettings {
   showMatchupTip: boolean
   overlayX?: number
   overlayY?: number
+  autoUpdate: boolean
+}
+
+export type UpdateStatus = 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+
+export interface UpdateNotification {
+  status: UpdateStatus
+  version?: string
+  error?: string
 }

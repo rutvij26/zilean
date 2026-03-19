@@ -33,6 +33,7 @@ import {
   EventsUpdate,
   LiveStatsUpdate,
   AwarenessUpdate,
+  UpdateNotification,
   AppSettings
 } from '../../shared/types'
 
@@ -314,6 +315,8 @@ function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('get-version', () => app.getVersion())
+
   ipcMain.handle('get-settings', () => loadSettings())
 
   ipcMain.handle('save-settings', (_event, settings) => {
@@ -344,6 +347,14 @@ function registerIpcHandlers(): void {
       const current = loadSettings()
       saveSettings({ ...current, overlayX: x, overlayY: y })
     }
+  })
+
+  ipcMain.handle('download-update', () => {
+    autoUpdater.downloadUpdate()
+  })
+
+  ipcMain.handle('install-update', () => {
+    autoUpdater.quitAndInstall()
   })
 
   // Dev-only: dump live Swagger spec from the running game client
@@ -380,7 +391,43 @@ app.whenReady().then(() => {
 
   // Auto-update (production only — skipped in dev)
   if (!process.env['ELECTRON_RENDERER_URL']) {
-    autoUpdater.checkForUpdatesAndNotify()
+    autoUpdater.autoDownload = false
+
+    autoUpdater.on('checking-for-update', () => {
+      const note: UpdateNotification = { status: 'checking' }
+      mainWindow?.webContents.send('update-status', note)
+    })
+
+    autoUpdater.on('update-available', (info) => {
+      const note: UpdateNotification = { status: 'available', version: info.version }
+      mainWindow?.webContents.send('update-status', note)
+      // Auto-download if user has enabled auto-update
+      if (runtimeSettings.autoUpdate) {
+        autoUpdater.downloadUpdate()
+      }
+    })
+
+    autoUpdater.on('update-not-available', () => {
+      const note: UpdateNotification = { status: 'not-available' }
+      mainWindow?.webContents.send('update-status', note)
+    })
+
+    autoUpdater.on('download-progress', () => {
+      const note: UpdateNotification = { status: 'downloading' }
+      mainWindow?.webContents.send('update-status', note)
+    })
+
+    autoUpdater.on('update-downloaded', () => {
+      const note: UpdateNotification = { status: 'downloaded' }
+      mainWindow?.webContents.send('update-status', note)
+    })
+
+    autoUpdater.on('error', (err) => {
+      const note: UpdateNotification = { status: 'error', error: err.message }
+      mainWindow?.webContents.send('update-status', note)
+    })
+
+    autoUpdater.checkForUpdates()
   }
 
   // Toggle mouse passthrough so overlay sections are clickable when hovered

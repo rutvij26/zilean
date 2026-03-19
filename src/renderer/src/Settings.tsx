@@ -45,7 +45,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   eventCoachingSensitivity: 'major',
   showLiveStats: true,
   showEventFeed: true,
-  showMatchupTip: true
+  showMatchupTip: true,
+  autoUpdate: true
 }
 
 export function Settings({ onSaved }: { onSaved?: (settings: AppSettings) => void } = {}): JSX.Element {
@@ -199,6 +200,18 @@ export function Settings({ onSaved }: { onSaved?: (settings: AppSettings) => voi
             onChange={(e) => setSettings({ ...settings, overlayVisible: e.target.checked })}
           />
           {' '}Show overlay
+        </label>
+      </div>
+
+      <div className="settings-group">
+        <label>Updates</label>
+        <label className="settings-checkbox">
+          <input
+            type="checkbox"
+            checked={settings.autoUpdate ?? true}
+            onChange={(e) => setSettings({ ...settings, autoUpdate: e.target.checked })}
+          />
+          {' '}Automatically download and install updates
         </label>
       </div>
 

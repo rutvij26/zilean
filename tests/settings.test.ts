@@ -19,7 +19,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   showEventFeed: true,
   showMatchupTip: true,
   overlayX: undefined,
-  overlayY: undefined
+  overlayY: undefined,
+  autoUpdate: true
 }
 
 function mergeWithDefaults(saved: Partial<AppSettings>): AppSettings {

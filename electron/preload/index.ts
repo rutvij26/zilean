@@ -1,10 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { AppSettings, CoachingUpdate, EventsUpdate, LiveStatsUpdate, AwarenessUpdate } from '../../shared/types'
+import { AppSettings, CoachingUpdate, EventsUpdate, LiveStatsUpdate, AwarenessUpdate, UpdateNotification } from '../../shared/types'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: (): void => ipcRenderer.send('window-minimize'),
   maximizeWindow: (): void => ipcRenderer.send('window-maximize'),
   closeWindow: (): void => ipcRenderer.send('window-close'),
+
+  getVersion: (): Promise<string> => ipcRenderer.invoke('get-version'),
 
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('get-settings'),
 
@@ -57,5 +59,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('overlay:setIgnoreMouseEvents', ignore),
     savePosition: (): Promise<void> =>
       ipcRenderer.invoke('overlay:savePosition')
-  }
+  },
+
+  onUpdateStatus: (callback: (note: UpdateNotification) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, note: UpdateNotification): void =>
+      callback(note)
+    ipcRenderer.on('update-status', handler)
+    return () => ipcRenderer.removeListener('update-status', handler)
+  },
+
+  downloadUpdate: (): Promise<void> => ipcRenderer.invoke('download-update'),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('install-update')
 })

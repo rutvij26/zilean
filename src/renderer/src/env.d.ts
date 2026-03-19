@@ -1,11 +1,12 @@
 /// <reference types="vite/client" />
 
-import { AppSettings, CoachingUpdate, EventsUpdate, LiveStatsUpdate, AwarenessUpdate } from '../../../shared/types'
+import { AppSettings, CoachingUpdate, EventsUpdate, LiveStatsUpdate, AwarenessUpdate, UpdateNotification } from '../../../shared/types'
 
 interface ElectronAPI {
   minimizeWindow: () => void
   maximizeWindow: () => void
   closeWindow: () => void
+  getVersion: () => Promise<string>
   getSettings: () => Promise<AppSettings>
   saveSettings: (settings: AppSettings) => Promise<{ success: boolean }>
   toggleOverlay: () => Promise<void>
@@ -20,6 +21,9 @@ interface ElectronAPI {
     setIgnoreMouseEvents: (ignore: boolean) => Promise<void>
     savePosition: () => Promise<void>
   }
+  onUpdateStatus: (callback: (note: UpdateNotification) => void) => () => void
+  downloadUpdate: () => Promise<void>
+  installUpdate: () => Promise<void>
 }
 
 declare global {

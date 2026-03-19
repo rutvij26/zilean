@@ -1,10 +1,66 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { AppSettings, GameEvent, LiveStats } from '../../../shared/types'
+import { AppSettings, GameEvent, LiveStats, UpdateNotification } from '../../../shared/types'
 import { EventFeed } from './components/EventFeed'
 import { Settings } from './Settings'
 import './styles/main.css'
 
 type NavView = 'dashboard' | 'settings'
+
+function UpdateToast({ note, onDismiss }: { note: UpdateNotification | null; onDismiss: () => void }): JSX.Element | null {
+  if (!note) return null
+
+  function handleUpdateNow(): void {
+    window.electronAPI?.downloadUpdate()
+  }
+
+  function handleInstall(): void {
+    window.electronAPI?.installUpdate()
+  }
+
+  let content: JSX.Element
+
+  if (note.status === 'checking') {
+    content = (
+      <>
+        <span className="update-toast-spinner" />
+        <span>Checking for updates...</span>
+      </>
+    )
+  } else if (note.status === 'not-available') {
+    content = <span>You&apos;re up to date</span>
+  } else if (note.status === 'available') {
+    content = (
+      <>
+        <span>Update {note.version} available</span>
+        <button className="update-toast-btn primary" onClick={handleUpdateNow}>Update Now</button>
+        <button className="update-toast-btn" onClick={onDismiss}>Later</button>
+      </>
+    )
+  } else if (note.status === 'downloading') {
+    content = (
+      <>
+        <span className="update-toast-spinner" />
+        <span>Downloading update...</span>
+      </>
+    )
+  } else if (note.status === 'downloaded') {
+    content = (
+      <>
+        <span>Update ready to install</span>
+        <button className="update-toast-btn primary" onClick={handleInstall}>Restart Now</button>
+        <button className="update-toast-btn" onClick={onDismiss}>Later</button>
+      </>
+    )
+  } else {
+    return null
+  }
+
+  return (
+    <div className="update-toast">
+      {content}
+    </div>
+  )
+}
 
 function TitleBar(): JSX.Element {
   const [maximized, setMaximized] = useState(false)
@@ -236,10 +292,26 @@ export function MainWindow(): JSX.Element {
   const [events, setEvents] = useState<GameEvent[]>([])
   const [liveStats, setLiveStats] = useState<LiveStats | null>(null)
   const [apiConnected, setApiConnected] = useState(false)
+  const [updateNote, setUpdateNote] = useState<UpdateNotification | null>(null)
+  const [appVersion, setAppVersion] = useState<string>('')
+  const dismissTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     window.electronAPI?.getSettings().then((s) => {
       setApiConnected(!!s.anthropicApiKey)
+    })
+    window.electronAPI?.getVersion().then(setAppVersion)
+  }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI?.onUpdateStatus) return
+    return window.electronAPI.onUpdateStatus((note) => {
+      setUpdateNote(note)
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current)
+      // Auto-dismiss non-actionable states after a few seconds
+      if (note.status === 'not-available' || note.status === 'checking') {
+        dismissTimerRef.current = setTimeout(() => setUpdateNote(null), note.status === 'checking' ? 8000 : 2500)
+      }
     })
   }, [])
 
@@ -294,6 +366,8 @@ export function MainWindow(): JSX.Element {
           </div>
         </div>
       </div>
+      <UpdateToast note={updateNote} onDismiss={() => setUpdateNote(null)} />
+      {appVersion && <span className="app-version">v{appVersion}</span>}
     </div>
   )
 }
