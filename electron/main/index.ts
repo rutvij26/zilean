@@ -10,6 +10,7 @@ import {
 } from 'electron'
 import * as path from 'path'
 import * as dotenv from 'dotenv'
+import { autoUpdater } from 'electron-updater'
 import {
   startPolling,
   stopPolling,
@@ -78,6 +79,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 760,
     minHeight: 520,
     title: 'Zilean — LoL Coach',
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -155,6 +157,8 @@ function createTray(): void {
         mainWindow?.webContents.send('navigate-to', 'settings')
       }
     },
+    { type: 'separator' },
+    { label: 'Check for Updates', click: () => autoUpdater.checkForUpdates() },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() }
   ])
@@ -270,6 +274,13 @@ async function handleGameState(gameState: GameState | null): Promise<void> {
 }
 
 function registerIpcHandlers(): void {
+  ipcMain.on('window-minimize', () => mainWindow?.minimize())
+  ipcMain.on('window-maximize', () => {
+    if (mainWindow?.isMaximized()) mainWindow.unmaximize()
+    else mainWindow?.maximize()
+  })
+  ipcMain.on('window-close', () => mainWindow?.close())
+
   ipcMain.on('resize-overlay', (_event, height: number) => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.setContentSize(300, Math.max(50, Math.ceil(height)))
@@ -325,6 +336,11 @@ app.whenReady().then(() => {
   overlayWindow = createOverlayWindow()
   createTray()
   registerIpcHandlers()
+
+  // Auto-update (production only — skipped in dev)
+  if (!process.env['ELECTRON_RENDERER_URL']) {
+    autoUpdater.checkForUpdatesAndNotify()
+  }
 
   // Toggle mouse passthrough so overlay sections are clickable when hovered
   let overlayInteractive = false

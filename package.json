@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Zilean — Real-time LoL AI Coach",
   "main": "./out/main/index.js",
-  "author": "",
+  "author": "rutvij26",
   "homepage": ".",
   "scripts": {
     "format": "prettier --write .",
@@ -17,8 +17,44 @@
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
+    "dist": "npm run build && electron-builder --win --publish always",
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "build": {
+    "appId": "com.zilean.lolcoach",
+    "productName": "Zilean",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "!out/**/*.map"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
+    }
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
@@ -46,6 +82,9 @@
     "vite": "^5.3.3",
     "vitest": "^2.0.3",
     "jsdom": "^24.1.0",
-    "@vitest/coverage-v8": "^2.0.3"
+    "@vitest/coverage-v8": "^2.0.3",
+    "semantic-release": "^24.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1"
   }
 }

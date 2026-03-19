@@ -26,17 +26,17 @@
 - [x] Discord-like main window (980×720, resizable, sidebar nav, integrated Settings, no menu bar)
 - [x] 144 tests passing (liveStats: 38, poller: 48, events: 19, coach: 21, gameLoop: 7, EventFeed: 11)
 
-## Release Pipeline — Pre-V3 Prerequisite
+## Release Pipeline — Pre-V3 Prerequisite ✅ COMPLETE
 
-- [ ] Update the minimze maximize and close bar on top of electron app to match the theme and should look seamless like discord.
-- [ ] Add `electron-builder` devDependency + build config in `package.json`
-- [ ] Configure GitHub Releases publish provider (uses `GH_TOKEN` env var)
-- [ ] Set up `electron-updater` auto-update in `electron/main/index.ts`
-- [ ] Add build scripts: `npm run build:win` (package), `npm run dist` (publish to GitHub)
-- [ ] Update tray with "Check for Updates" option
-- [ ] Document release flow in README
-- [ ] Skip code signing for open beta (SmartScreen warning expected, documented)
-- [ ] Output: Windows NSIS installer `.exe` + portable `.exe`
+- [x] Update the minimize maximize and close bar on top of electron app to match the theme and should look seamless like discord.
+- [x] Add `electron-builder` devDependency + build config in `package.json`
+- [x] Configure GitHub Releases publish provider (uses `GH_TOKEN` env var)
+- [x] Set up `electron-updater` auto-update in `electron/main/index.ts`
+- [x] Add build scripts: `npm run build:win` (package), `npm run dist` (publish to GitHub)
+- [x] Update tray with "Check for Updates" option
+- [x] Document release flow in README
+- [x] Skip code signing for open beta (SmartScreen warning expected, documented)
+- [x] Output: Windows NSIS installer `.exe` + portable `.exe`
 
 ## V2 — In-Game Enhancement (no external API required)
 

@@ -3,6 +3,9 @@
 import { AppSettings, CoachingUpdate, EventsUpdate, LiveStatsUpdate } from '../../../shared/types'
 
 interface ElectronAPI {
+  minimizeWindow: () => void
+  maximizeWindow: () => void
+  closeWindow: () => void
   getSettings: () => Promise<AppSettings>
   saveSettings: (settings: AppSettings) => Promise<{ success: boolean }>
   toggleOverlay: () => Promise<void>

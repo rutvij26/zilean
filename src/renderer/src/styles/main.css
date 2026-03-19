@@ -66,11 +66,83 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── Title Bar ──────────────────────────────── */
+
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.title-bar {
+  display: flex;
+  flex-shrink: 0;
+  height: 32px;
+  user-select: none;
+}
+
+.title-bar-sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  -webkit-app-region: drag;
+}
+
+.title-bar-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: var(--bg-content);
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.title-bar-drag {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+.title-bar-controls {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.title-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  outline: none;
+  font-family: inherit;
+  padding: 0;
+}
+
+.title-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.title-btn.close:hover {
+  background: var(--red);
+  color: #fff;
+}
+
 /* ── App Layout ─────────────────────────────── */
 
 .app-layout {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   background: var(--bg-content);
 }
@@ -84,6 +156,7 @@ body {
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border-dark);
+  border-top: 1px solid var(--border-dark);
   user-select: none;
 }
 

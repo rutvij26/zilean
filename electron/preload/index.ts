@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { AppSettings, CoachingUpdate, EventsUpdate, LiveStatsUpdate } from '../../shared/types'
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  minimizeWindow: (): void => ipcRenderer.send('window-minimize'),
+  maximizeWindow: (): void => ipcRenderer.send('window-maximize'),
+  closeWindow: (): void => ipcRenderer.send('window-close'),
+
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('get-settings'),
 
   saveSettings: (settings: AppSettings): Promise<{ success: boolean }> =>

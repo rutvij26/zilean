@@ -1,10 +1,53 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { AppSettings, GameEvent, LiveStats } from '../../../shared/types'
 import { EventFeed } from './components/EventFeed'
 import { Settings } from './Settings'
 import './styles/main.css'
 
 type NavView = 'dashboard' | 'settings'
+
+function TitleBar(): JSX.Element {
+  const [maximized, setMaximized] = useState(false)
+  const maximizedRef = useRef(maximized)
+  maximizedRef.current = maximized
+
+  function handleMaximize(): void {
+    window.electronAPI?.maximizeWindow()
+    setMaximized(!maximizedRef.current)
+  }
+
+  return (
+    <div className="title-bar">
+      <div className="title-bar-sidebar" />
+      <div className="title-bar-content">
+        <div className="title-bar-drag" />
+        <div className="title-bar-controls">
+          <button
+            className="title-btn minimize"
+            onClick={() => window.electronAPI?.minimizeWindow()}
+            title="Minimize"
+          >
+            <span>&#8211;</span>
+          </button>
+          <button
+            className="title-btn maximize"
+            onClick={handleMaximize}
+            title={maximized ? 'Restore' : 'Maximize'}
+          >
+            <span>{maximized ? '⧉' : '□'}</span>
+          </button>
+          <button
+            className="title-btn close"
+            onClick={() => window.electronAPI?.closeWindow()}
+            title="Close"
+          >
+            <span>&#10005;</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function Sidebar({
   view,
@@ -228,24 +271,27 @@ export function MainWindow(): JSX.Element {
   }
 
   return (
-    <div className="app-layout">
-      <Sidebar view={view} onNavigate={setView} apiConnected={apiConnected} />
-      <div className="app-content">
-        <div className="content-header">
-          <span className="content-header-icon">
-            {view === 'dashboard' ? '◈' : '◎'}
-          </span>
-          <div>
-            <div className="content-header-title">{contentMeta[view].title}</div>
-            <div className="content-header-desc">{contentMeta[view].desc}</div>
+    <div className="app-root">
+      <TitleBar />
+      <div className="app-layout">
+        <Sidebar view={view} onNavigate={setView} apiConnected={apiConnected} />
+        <div className="app-content">
+          <div className="content-header">
+            <span className="content-header-icon">
+              {view === 'dashboard' ? '◈' : '◎'}
+            </span>
+            <div>
+              <div className="content-header-title">{contentMeta[view].title}</div>
+              <div className="content-header-desc">{contentMeta[view].desc}</div>
+            </div>
           </div>
-        </div>
-        <div className="content-body">
-          {view === 'dashboard' ? (
-            <DashboardView events={events} liveStats={liveStats} />
-          ) : (
-            <Settings onSaved={handleSettingsSaved} />
-          )}
+          <div className="content-body">
+            {view === 'dashboard' ? (
+              <DashboardView events={events} liveStats={liveStats} />
+            ) : (
+              <Settings onSaved={handleSettingsSaved} />
+            )}
+          </div>
         </div>
       </div>
     </div>
