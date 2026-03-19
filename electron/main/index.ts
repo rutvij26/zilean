@@ -32,6 +32,7 @@ import {
   CoachingUpdate,
   EventsUpdate,
   LiveStatsUpdate,
+  AwarenessUpdate,
   AppSettings
 } from '../../shared/types'
 
@@ -193,6 +194,21 @@ function broadcastLiveStats(state: GameState): void {
   }
 }
 
+function broadcastAwarenessUpdate(state: GameState): void {
+  const update: AwarenessUpdate = {
+    objectiveTimers: state.objectiveTimers,
+    buffDurations: state.buffDurations,
+    deadTimeTotal: state.deadTimeTotal,
+    abilityLevelHint: state.abilityLevelHint
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('awareness-update', update)
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('awareness-update', update)
+  }
+}
+
 function startEventPolling(): void {
   if (eventPollTimer) return
   eventPollTimer = setInterval(async () => {
@@ -242,8 +258,9 @@ async function handleGameState(gameState: GameState | null): Promise<void> {
     }
   }
 
-  // Always broadcast live stats on every poll (no Claude needed)
+  // Always broadcast live stats and awareness on every poll (no Claude needed)
   broadcastLiveStats(gameState)
+  broadcastAwarenessUpdate(gameState)
 
   const fingerprintChanged = hasStateChangedSince(gameState)
   const forceDue = Date.now() - lastCoachTime > getForceIntervalMs()

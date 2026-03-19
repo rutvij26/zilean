@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import { AppSettings, CoachingUpdate, EventsUpdate, LiveStatsUpdate } from '../../../shared/types'
+import { AppSettings, CoachingUpdate, EventsUpdate, LiveStatsUpdate, AwarenessUpdate } from '../../../shared/types'
 
 interface ElectronAPI {
   minimizeWindow: () => void
@@ -13,6 +13,7 @@ interface ElectronAPI {
   resizeOverlay: (height: number) => void
   onEventsUpdate: (callback: (update: EventsUpdate) => void) => () => void
   onLiveStatsUpdate: (callback: (update: LiveStatsUpdate) => void) => () => void
+  onAwarenessUpdate: (callback: (update: AwarenessUpdate) => void) => () => void
   onNavigateTo: (callback: (view: string) => void) => () => void
   dumpSwagger: () => Promise<{ success: boolean; error?: string }>
 }

@@ -76,7 +76,11 @@ const mockGameState: GameState = {
   enemies: [],
   cs: 40,
   wardScore: 10,
-  level: 7
+  level: 7,
+  objectiveTimers: { baronAvailable: false, heraldAvailable: true, dragonAvailableIn: 0 },
+  buffDurations: { baronBuffRemaining: 0, dragonBuffRemaining: 0 },
+  deadTimeTotal: 15,
+  abilityLevelHint: 'Level Q next (max first for damage)'
 }
 
 const mockGoals: CoachingGoals = {

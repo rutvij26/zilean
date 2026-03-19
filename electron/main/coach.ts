@@ -66,12 +66,28 @@ function buildPrompt(state: GameState, historicalContext?: string): string {
   const matchupTipInstruction = buildMatchupTipInstruction(state)
   const teamContext = buildTeamContextSection(state)
 
+  const baronStatus = state.objectiveTimers.baronAvailable ? 'available' : 'not spawned'
+  const heraldStatus = state.objectiveTimers.heraldAvailable ? 'available' : 'not spawned'
+  const dragonStatus = state.objectiveTimers.dragonAvailableIn === 0
+    ? 'available'
+    : `${Math.round(state.objectiveTimers.dragonAvailableIn)}s`
+  const baronBuff = state.buffDurations.baronBuffRemaining > 0
+    ? `${Math.round(state.buffDurations.baronBuffRemaining)}s remaining`
+    : 'none'
+  const dragonBuff = state.buffDurations.dragonBuffRemaining > 0
+    ? `${Math.round(state.buffDurations.dragonBuffRemaining)}s remaining`
+    : 'none'
+  const objectiveLine = `Baron: ${baronStatus} | Herald: ${heraldStatus} | Dragon: ${dragonStatus} | Baron buff: ${baronBuff} | Dragon buff: ${dragonBuff}`
+  const awarenessLine = `Dead time: ${state.deadTimeTotal}s | ${state.abilityLevelHint}`
+
   return `State: ${state.champion} ${state.role} ${state.gameTime} | ${state.kills}/${state.deaths}/${state.assists} | ${state.gold}g | CS ${state.cs} | Lv${state.level}
 Items: ${itemsStr}
 Abilities: ${abilitiesStr} | ${runesStr} | ${spellsStr}
 Opponent: ${opponentStr}
 ${teamContext}
-Events: ${eventsStr} | Gold diff: ${goldDiffStr}${historicalSection}
+Events: ${eventsStr} | Gold diff: ${goldDiffStr}
+Objectives: ${objectiveLine}
+Awareness: ${awarenessLine}${historicalSection}
 
 Generate coaching goals for the next 3 minutes.
 Suggest the single best next item considering gold (${state.gold}g), items built, enemy comp, and game phase.

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   AppSettings,
+  AwarenessUpdate,
   CoachingGoals,
   CoachingStatus,
   GameEvent,
@@ -99,6 +100,51 @@ function LiveStatsRow({ stats }: { stats: LiveStats }): JSX.Element {
   )
 }
 
+function AwarenessRow({ awareness }: { awareness: AwarenessUpdate }): JSX.Element {
+  const { objectiveTimers, buffDurations, deadTimeTotal, abilityLevelHint } = awareness
+
+  const baronText = objectiveTimers.baronAvailable ? 'Baron ✓' : 'Baron ✗'
+  const heraldText = objectiveTimers.heraldAvailable ? 'Herald ✓' : null
+  const dragonText = objectiveTimers.dragonAvailableIn === 0
+    ? 'Dragon ✓'
+    : `Dragon ${Math.round(objectiveTimers.dragonAvailableIn)}s`
+
+  const buffParts: string[] = []
+  if (buffDurations.baronBuffRemaining > 0) {
+    buffParts.push(`Baron buff ${Math.round(buffDurations.baronBuffRemaining)}s`)
+  }
+  if (buffDurations.dragonBuffRemaining > 0) {
+    buffParts.push(`Dragon buff ${Math.round(buffDurations.dragonBuffRemaining)}s`)
+  }
+
+  return (
+    <div className="awareness-row">
+      <span className="stat-item">{baronText}</span>
+      {heraldText && <><span className="stat-sep">·</span><span className="stat-item">{heraldText}</span></>}
+      <span className="stat-sep">·</span>
+      <span className="stat-item">{dragonText}</span>
+      {deadTimeTotal > 0 && (
+        <>
+          <span className="stat-sep">·</span>
+          <span className="stat-item">Dead {deadTimeTotal}s</span>
+        </>
+      )}
+      {buffParts.length > 0 && (
+        <>
+          <span className="stat-sep">·</span>
+          <span className="stat-item buff-active">{buffParts.join(' | ')}</span>
+        </>
+      )}
+      {abilityLevelHint && (
+        <>
+          <span className="stat-sep">·</span>
+          <span className="stat-item">{abilityLevelHint}</span>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function Overlay(): JSX.Element {
   const [state, setState] = useState<OverlayState>({
     goals: null,
@@ -113,6 +159,7 @@ export function Overlay(): JSX.Element {
   const [eventsCollapsed, setEventsCollapsed] = useState(true)
   const [bodyCollapsed, setBodyCollapsed] = useState(false)
   const [liveStats, setLiveStats] = useState<LiveStats | null>(null)
+  const [awareness, setAwareness] = useState<AwarenessUpdate | null>(null)
   const [settings, setSettings] = useState<AppSettings | null>(null)
 
   const [collapsed, setCollapsed] = useState<CollapsedState>({
@@ -201,6 +248,14 @@ export function Overlay(): JSX.Element {
     return cleanup
   }, [])
 
+  useEffect(() => {
+    if (!window.electronAPI?.onAwarenessUpdate) return
+    const cleanup = window.electronAPI.onAwarenessUpdate((update) => {
+      setAwareness(update)
+    })
+    return cleanup
+  }, [])
+
   const toggle = (key: keyof CollapsedState): void =>
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
 
@@ -249,6 +304,13 @@ export function Overlay(): JSX.Element {
           {showLiveStats && liveStats && (
             <>
               <LiveStatsRow stats={liveStats} />
+              <hr className="overlay-divider" />
+            </>
+          )}
+
+          {awareness && (
+            <>
+              <AwarenessRow awareness={awareness} />
               <hr className="overlay-divider" />
             </>
           )}

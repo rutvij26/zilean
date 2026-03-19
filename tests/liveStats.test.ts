@@ -39,7 +39,11 @@ const baseState: GameState = {
   enemies: [{ championName: 'Ahri', items: [], level: 9 }],
   cs: 72,
   wardScore: 15,
-  level: 8
+  level: 8,
+  objectiveTimers: { baronAvailable: false, heraldAvailable: true, dragonAvailableIn: 0 },
+  buffDurations: { baronBuffRemaining: 0, dragonBuffRemaining: 0 },
+  deadTimeTotal: 0,
+  abilityLevelHint: 'Level Q next (max first for damage)'
 }
 
 const killEvents: GameEvent[] = [

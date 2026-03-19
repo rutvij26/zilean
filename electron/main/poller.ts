@@ -1,5 +1,5 @@
 import * as https from 'https'
-import { GameState, GameEvent, LaneOpponent, ChampionContext } from '../../shared/types'
+import { GameState, GameEvent, LaneOpponent, ChampionContext, ObjectiveTimers, BuffDurations } from '../../shared/types'
 
 const RIOT_LIVE_API = 'https://127.0.0.1:2999/liveclientdata'
 const POLL_INTERVAL_MS = 60_000
@@ -443,6 +443,116 @@ export function formatGameTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+const BARON_SPAWN_TIME = 1200   // 20 min
+const HERALD_SPAWN_TIME = 480   // 8 min
+const DRAGON_RESPAWN_DELAY = 300  // 5 min
+const BARON_BUFF_DURATION = 180   // 3 min
+const DRAGON_BUFF_DURATION = 210  // 3.5 min
+
+export function computeObjectiveTimers(
+  gameTimeSec: number,
+  events: RiotEvent[]
+): ObjectiveTimers {
+  const baronAvailable = gameTimeSec >= BARON_SPAWN_TIME
+
+  const heraldAvailable = gameTimeSec >= HERALD_SPAWN_TIME && gameTimeSec < BARON_SPAWN_TIME
+
+  // Find the last DragonKill event time to compute next dragon respawn
+  const lastDragonEvent = [...events]
+    .filter((e) => e.EventName === 'DragonKill')
+    .sort((a, b) => b.EventTime - a.EventTime)[0]
+
+  let dragonAvailableIn = 0
+  if (lastDragonEvent) {
+    const nextDragonTime = lastDragonEvent.EventTime + DRAGON_RESPAWN_DELAY
+    dragonAvailableIn = Math.max(0, nextDragonTime - gameTimeSec)
+  } else if (gameTimeSec < 300) {
+    // Dragon spawns at 5:00
+    dragonAvailableIn = Math.max(0, 300 - gameTimeSec)
+  }
+
+  return { baronAvailable, heraldAvailable, dragonAvailableIn }
+}
+
+export function computeBuffDurations(
+  gameTimeSec: number,
+  events: RiotEvent[]
+): BuffDurations {
+  // Find the last BaronKill event time
+  const lastBaronEvent = [...events]
+    .filter((e) => e.EventName === 'BaronKill')
+    .sort((a, b) => b.EventTime - a.EventTime)[0]
+
+  const baronBuffRemaining = lastBaronEvent
+    ? Math.max(0, lastBaronEvent.EventTime + BARON_BUFF_DURATION - gameTimeSec)
+    : 0
+
+  // Find the last DragonKill event time
+  const lastDragonEvent = [...events]
+    .filter((e) => e.EventName === 'DragonKill')
+    .sort((a, b) => b.EventTime - a.EventTime)[0]
+
+  const dragonBuffRemaining = lastDragonEvent
+    ? Math.max(0, lastDragonEvent.EventTime + DRAGON_BUFF_DURATION - gameTimeSec)
+    : 0
+
+  return { baronBuffRemaining, dragonBuffRemaining }
+}
+
+export function computeDeadTimeTotal(
+  events: RiotEvent[],
+  summonerName: string
+): number {
+  // Sum up respawn timers from ChampionKill events where victim = local player
+  // Riot API does not expose respawn timer directly, so we approximate based on level
+  // Respawn time formula: 10 + (2.5 * (level - 1)) seconds (simplified)
+  return events
+    .filter((e) => e.EventName === 'ChampionKill' && e.VictimName === summonerName)
+    .reduce((total, e) => {
+      // We don't have the level at the time of death, so use event time to approximate
+      // Using a simple scaling: early game ~15s, mid ~20s, late ~35s
+      const approxRespawn = e.EventTime < 900 ? 15
+        : e.EventTime < 1800 ? 22
+        : 35
+      return total + approxRespawn
+    }, 0)
+}
+
+export function computeAbilityLevelHint(level: number): string {
+  // Generic rule-based ability level hint
+  // LoL standard leveling: R at 6/11/16, then max Q > W > E (generic)
+  if (level < 1) return ''
+
+  // Levels where R is available to upgrade
+  if (level === 6 || level === 11 || level === 16) {
+    return 'Level R now (ultimate available)'
+  }
+
+  // Generic max order: Q > W > E, R when available
+  // Determine which ability to level based on current level
+  // Typical order: Q1→W1→E1→R1→Q2→Q3→R2→Q4→W2→Q5→R3→W3→E2→W4→E3→E4→W5→E5
+  const qPriority = [1, 5, 7, 9, 13]    // Q levels by champion level
+  const wPriority = [2, 10, 12, 14, 17]  // W levels by champion level
+  const ePriority = [3, 15, 18]           // E levels by champion level (remaining)
+  const rLevels = new Set([6, 11, 16])
+
+  if (rLevels.has(level)) {
+    return 'Level R now (ultimate available)'
+  }
+  if (qPriority.includes(level)) {
+    return 'Level Q next (max first for damage)'
+  }
+  if (wPriority.includes(level)) {
+    return 'Level W next (rank 2 priority)'
+  }
+  if (ePriority.includes(level)) {
+    return 'Level E next (rank 3 priority)'
+  }
+
+  // Default hint for remaining levels
+  return 'Max R > Q > W > E when leveling'
+}
+
 async function poll(callback: (state: GameState | null) => void): Promise<void> {
   const data = await fetchAllData()
   if (!data) {
@@ -515,7 +625,11 @@ async function poll(callback: (state: GameState | null) => void): Promise<void> 
       enemies,
       cs: activePlayerFull.scores.creepScore ?? 0,
       wardScore: activePlayerFull.scores.wardScore ?? 0,
-      level: activePlayerFull.level ?? 1
+      level: activePlayerFull.level ?? 1,
+      objectiveTimers: computeObjectiveTimers(data.gameTime, data.events.Events),
+      buffDurations: computeBuffDurations(data.gameTime, data.events.Events),
+      deadTimeTotal: computeDeadTimeTotal(data.events.Events, summonerName),
+      abilityLevelHint: computeAbilityLevelHint(activePlayerFull.level ?? 1)
     }
 
     callback(gameState)

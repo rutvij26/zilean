@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { AppSettings, CoachingUpdate, EventsUpdate, LiveStatsUpdate } from '../../shared/types'
+import { AppSettings, CoachingUpdate, EventsUpdate, LiveStatsUpdate, AwarenessUpdate } from '../../shared/types'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: (): void => ipcRenderer.send('window-minimize'),
@@ -34,6 +34,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       callback(update)
     ipcRenderer.on('live-stats-update', handler)
     return () => ipcRenderer.removeListener('live-stats-update', handler)
+  },
+
+  onAwarenessUpdate: (callback: (update: AwarenessUpdate) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, update: AwarenessUpdate): void =>
+      callback(update)
+    ipcRenderer.on('awareness-update', handler)
+    return () => ipcRenderer.removeListener('awareness-update', handler)
   },
 
   onNavigateTo: (callback: (view: string) => void): (() => void) => {

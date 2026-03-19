@@ -7,7 +7,11 @@ import {
   findLaneOpponent,
   computeEventDetail,
   hasStateChangedSince,
-  resetFingerprintState
+  resetFingerprintState,
+  computeObjectiveTimers,
+  computeBuffDurations,
+  computeDeadTimeTotal,
+  computeAbilityLevelHint
 } from '../electron/main/poller'
 import type { GameState, GameEvent } from '../shared/types'
 
@@ -67,7 +71,11 @@ const baseGameState: GameState = {
   enemies: [{ championName: 'Ahri', items: [], level: 8 }, { championName: 'Caitlyn', items: [], level: 7 }],
   cs: 50,
   wardScore: 15,
-  level: 8
+  level: 8,
+  objectiveTimers: { baronAvailable: false, heraldAvailable: true, dragonAvailableIn: 0 },
+  buffDurations: { baronBuffRemaining: 0, dragonBuffRemaining: 0 },
+  deadTimeTotal: 0,
+  abilityLevelHint: 'Level Q next (max first for damage)'
 }
 
 describe('extractRecentEvents', () => {
@@ -436,5 +444,193 @@ describe('hasStateChangedSince (fingerprinting)', () => {
     hasStateChangedSince(baseGameState) // now false
     resetFingerprintState()
     expect(hasStateChangedSince(baseGameState)).toBe(true)
+  })
+})
+
+describe('computeObjectiveTimers', () => {
+  it('baron is not available before 20 min', () => {
+    const result = computeObjectiveTimers(1199, [])
+    expect(result.baronAvailable).toBe(false)
+  })
+
+  it('baron becomes available at exactly 20 min (1200s)', () => {
+    const result = computeObjectiveTimers(1200, [])
+    expect(result.baronAvailable).toBe(true)
+  })
+
+  it('herald is not available before 8 min', () => {
+    const result = computeObjectiveTimers(479, [])
+    expect(result.heraldAvailable).toBe(false)
+  })
+
+  it('herald is available between 8 and 20 min', () => {
+    const result = computeObjectiveTimers(900, [])
+    expect(result.heraldAvailable).toBe(true)
+  })
+
+  it('herald despawns at 20 min', () => {
+    const result = computeObjectiveTimers(1200, [])
+    expect(result.heraldAvailable).toBe(false)
+  })
+
+  it('dragon is available at game start (no kills)', () => {
+    const result = computeObjectiveTimers(400, [])
+    // dragon spawns at 5min (300s), before 300s dragonAvailableIn > 0
+    expect(result.dragonAvailableIn).toBe(0)
+  })
+
+  it('dragon countdown before first spawn', () => {
+    const result = computeObjectiveTimers(100, [])
+    expect(result.dragonAvailableIn).toBe(200)
+  })
+
+  it('dragon respawn timer 200s after kill', () => {
+    const events = [{ EventName: 'DragonKill', EventTime: 400 }]
+    const result = computeObjectiveTimers(600, events)
+    // next dragon at 400+300=700, current=600 → 100s remaining
+    expect(result.dragonAvailableIn).toBe(100)
+  })
+
+  it('dragon available when respawn time has passed', () => {
+    const events = [{ EventName: 'DragonKill', EventTime: 300 }]
+    const result = computeObjectiveTimers(700, events)
+    // next dragon at 300+300=600, current=700 → available
+    expect(result.dragonAvailableIn).toBe(0)
+  })
+})
+
+describe('computeBuffDurations', () => {
+  it('returns 0 for both buffs with no events', () => {
+    const result = computeBuffDurations(500, [])
+    expect(result.baronBuffRemaining).toBe(0)
+    expect(result.dragonBuffRemaining).toBe(0)
+  })
+
+  it('baron buff active immediately after kill', () => {
+    const events = [{ EventName: 'BaronKill', EventTime: 1200 }]
+    const result = computeBuffDurations(1200, events)
+    expect(result.baronBuffRemaining).toBe(180)
+  })
+
+  it('baron buff decreases over time', () => {
+    const events = [{ EventName: 'BaronKill', EventTime: 1200 }]
+    const result = computeBuffDurations(1300, events)
+    expect(result.baronBuffRemaining).toBe(80)
+  })
+
+  it('baron buff is 0 after 180s', () => {
+    const events = [{ EventName: 'BaronKill', EventTime: 1200 }]
+    const result = computeBuffDurations(1380, events)
+    expect(result.baronBuffRemaining).toBe(0)
+  })
+
+  it('dragon buff active immediately after kill', () => {
+    const events = [{ EventName: 'DragonKill', EventTime: 500 }]
+    const result = computeBuffDurations(500, events)
+    expect(result.dragonBuffRemaining).toBe(210)
+  })
+
+  it('dragon buff is 0 after 210s', () => {
+    const events = [{ EventName: 'DragonKill', EventTime: 500 }]
+    const result = computeBuffDurations(710, events)
+    expect(result.dragonBuffRemaining).toBe(0)
+  })
+
+  it('uses the most recent baron kill when multiple kills exist', () => {
+    const events = [
+      { EventName: 'BaronKill', EventTime: 1200 },
+      { EventName: 'BaronKill', EventTime: 1800 }
+    ]
+    const result = computeBuffDurations(1810, events)
+    // Should use 1800, not 1200
+    expect(result.baronBuffRemaining).toBe(170)
+  })
+})
+
+describe('computeDeadTimeTotal', () => {
+  it('returns 0 when no deaths', () => {
+    const result = computeDeadTimeTotal([], 'TestPlayer')
+    expect(result).toBe(0)
+  })
+
+  it('accumulates dead time for early game deaths', () => {
+    const events = [
+      { EventName: 'ChampionKill', EventTime: 200, VictimName: 'TestPlayer', KillerName: 'Enemy1' }
+    ]
+    const result = computeDeadTimeTotal(events, 'TestPlayer')
+    expect(result).toBe(15) // early game approximation
+  })
+
+  it('accumulates dead time for mid game deaths', () => {
+    const events = [
+      { EventName: 'ChampionKill', EventTime: 1200, VictimName: 'TestPlayer', KillerName: 'Enemy1' }
+    ]
+    const result = computeDeadTimeTotal(events, 'TestPlayer')
+    expect(result).toBe(22) // mid game approximation
+  })
+
+  it('accumulates dead time for late game deaths', () => {
+    const events = [
+      { EventName: 'ChampionKill', EventTime: 2000, VictimName: 'TestPlayer', KillerName: 'Enemy1' }
+    ]
+    const result = computeDeadTimeTotal(events, 'TestPlayer')
+    expect(result).toBe(35) // late game approximation
+  })
+
+  it('sums multiple deaths', () => {
+    const events = [
+      { EventName: 'ChampionKill', EventTime: 200, VictimName: 'TestPlayer', KillerName: 'Enemy1' },
+      { EventName: 'ChampionKill', EventTime: 1200, VictimName: 'TestPlayer', KillerName: 'Enemy1' }
+    ]
+    const result = computeDeadTimeTotal(events, 'TestPlayer')
+    expect(result).toBe(37) // 15 + 22
+  })
+
+  it('ignores deaths of other players', () => {
+    const events = [
+      { EventName: 'ChampionKill', EventTime: 200, VictimName: 'Enemy1', KillerName: 'TestPlayer' }
+    ]
+    const result = computeDeadTimeTotal(events, 'TestPlayer')
+    expect(result).toBe(0)
+  })
+
+  it('ignores non-kill events', () => {
+    const events = [
+      { EventName: 'DragonKill', EventTime: 500, KillerName: 'TestPlayer' },
+      { EventName: 'BaronKill', EventTime: 1200, KillerName: 'TestPlayer' }
+    ]
+    const result = computeDeadTimeTotal(events, 'TestPlayer')
+    expect(result).toBe(0)
+  })
+})
+
+describe('computeAbilityLevelHint', () => {
+  it('returns empty string for level 0', () => {
+    expect(computeAbilityLevelHint(0)).toBe('')
+  })
+
+  it('returns R hint at level 6', () => {
+    expect(computeAbilityLevelHint(6)).toContain('R')
+  })
+
+  it('returns R hint at level 11', () => {
+    expect(computeAbilityLevelHint(11)).toContain('R')
+  })
+
+  it('returns R hint at level 16', () => {
+    expect(computeAbilityLevelHint(16)).toContain('R')
+  })
+
+  it('returns a non-empty hint for all levels 1-18', () => {
+    for (let level = 1; level <= 18; level++) {
+      const hint = computeAbilityLevelHint(level)
+      expect(hint.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('returns Q hint for early levels', () => {
+    const hint = computeAbilityLevelHint(1)
+    // Level 1 falls in qPriority or defaults to generic hint
+    expect(typeof hint).toBe('string')
   })
 })

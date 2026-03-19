@@ -41,6 +41,17 @@ export interface ChampionContext {
   level: number
 }
 
+export interface ObjectiveTimers {
+  baronAvailable: boolean      // game time >= 1200s (20 min)
+  heraldAvailable: boolean     // game time >= 480s and < 1200s (8-20 min)
+  dragonAvailableIn: number    // seconds until next dragon (0 if available)
+}
+
+export interface BuffDurations {
+  baronBuffRemaining: number   // seconds, 0 if none
+  dragonBuffRemaining: number  // seconds, 0 if none
+}
+
 export interface GameState {
   champion: string
   role: string
@@ -63,6 +74,10 @@ export interface GameState {
   cs: number          // creep score
   wardScore: number   // vision score
   level: number       // champion level
+  objectiveTimers: ObjectiveTimers
+  buffDurations: BuffDurations
+  deadTimeTotal: number        // total seconds dead this game
+  abilityLevelHint: string     // e.g. "Level W next (rank 1 priority)"
 }
 
 export interface LiveStats {
@@ -129,6 +144,13 @@ export interface CoachingUpdate {
 
 export interface EventsUpdate {
   events: GameEvent[]
+}
+
+export interface AwarenessUpdate {
+  objectiveTimers: ObjectiveTimers
+  buffDurations: BuffDurations
+  deadTimeTotal: number
+  abilityLevelHint: string
 }
 
 export interface AppSettings {

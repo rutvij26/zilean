@@ -45,7 +45,11 @@ const mockGameState: GameState = {
   ],
   cs: 72,
   wardScore: 15,
-  level: 9
+  level: 9,
+  objectiveTimers: { baronAvailable: false, heraldAvailable: true, dragonAvailableIn: 45 },
+  buffDurations: { baronBuffRemaining: 0, dragonBuffRemaining: 120 },
+  deadTimeTotal: 32,
+  abilityLevelHint: 'Level W next (rank 2 priority)'
 }
 
 const validResponse: CoachingGoals = {
