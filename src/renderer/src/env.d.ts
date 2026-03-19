@@ -15,6 +15,10 @@ interface ElectronAPI {
   onLiveStatsUpdate: (callback: (update: LiveStatsUpdate) => void) => () => void
   onNavigateTo: (callback: (view: string) => void) => () => void
   dumpSwagger: () => Promise<{ success: boolean; error?: string }>
+  overlay?: {
+    setIgnoreMouseEvents: (ignore: boolean) => Promise<void>
+    savePosition: () => Promise<void>
+  }
 }
 
 declare global {

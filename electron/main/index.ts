@@ -101,9 +101,13 @@ function createOverlayWindow(): BrowserWindow {
   const OVERLAY_WIDTH = 300
   const OVERLAY_HEIGHT = 50
 
+  const savedSettings = loadSettings()
+  const savedX = savedSettings.overlayX
+  const savedY = savedSettings.overlayY
+
   const win = new BrowserWindow({
-    x: workW - OVERLAY_WIDTH - 20,
-    y: 50,
+    x: savedX !== undefined ? savedX : workW - OVERLAY_WIDTH - 20,
+    y: savedY !== undefined ? savedY : 50,
     width: OVERLAY_WIDTH,
     height: OVERLAY_HEIGHT,
     transparent: true,
@@ -121,6 +125,12 @@ function createOverlayWindow(): BrowserWindow {
 
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setIgnoreMouseEvents(true, { forward: true })
+
+  win.on('moved', () => {
+    const [x, y] = win.getPosition()
+    const current = loadSettings()
+    saveSettings({ ...current, overlayX: x, overlayY: y })
+  })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}?overlay=true`)
@@ -302,6 +312,20 @@ function registerIpcHandlers(): void {
   ipcMain.handle('toggle-overlay', () => {
     if (overlayWindow) {
       overlayWindow.isVisible() ? overlayWindow.hide() : overlayWindow.show()
+    }
+  })
+
+  ipcMain.handle('overlay:setIgnoreMouseEvents', (_event, ignore: boolean) => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.setIgnoreMouseEvents(ignore, { forward: true })
+    }
+  })
+
+  ipcMain.handle('overlay:savePosition', () => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      const [x, y] = overlayWindow.getPosition()
+      const current = loadSettings()
+      saveSettings({ ...current, overlayX: x, overlayY: y })
     }
   })
 

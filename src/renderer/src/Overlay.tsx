@@ -210,9 +210,32 @@ export function Overlay(): JSX.Element {
   const showEventFeed = settings?.showEventFeed !== false
   const showMatchupTip = settings?.showMatchupTip !== false
 
+  const dragHandleStyle = {
+    WebkitAppRegion: 'drag',
+    cursor: 'grab',
+    height: '6px',
+    background: 'rgba(255,255,255,0.12)',
+    borderRadius: '3px',
+    margin: '2px 8px 0',
+    flexShrink: 0
+  } as React.CSSProperties
+
+  const handleDragEnter = (): void => {
+    window.electronAPI?.overlay?.setIgnoreMouseEvents(false)
+  }
+
+  const handleDragLeave = (): void => {
+    window.electronAPI?.overlay?.setIgnoreMouseEvents(true)
+  }
+
   if (status === 'waiting') {
     return (
       <div ref={cardRef} className="overlay-card">
+        <div
+          style={dragHandleStyle}
+          onMouseEnter={handleDragEnter}
+          onMouseLeave={handleDragLeave}
+        />
         <div
           className="overlay-header overlay-header--clickable"
           onClick={() => setBodyCollapsed((v) => !v)}
@@ -231,6 +254,11 @@ export function Overlay(): JSX.Element {
 
   return (
     <div ref={cardRef} className={`overlay-card${isRefreshing ? ' refreshing' : ''}`}>
+      <div
+        style={dragHandleStyle}
+        onMouseEnter={handleDragEnter}
+        onMouseLeave={handleDragLeave}
+      />
       <div
         className="overlay-header overlay-header--clickable"
         onClick={() => setBodyCollapsed((v) => !v)}

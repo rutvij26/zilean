@@ -43,5 +43,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   dumpSwagger: (): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('dump-swagger')
+    ipcRenderer.invoke('dump-swagger'),
+
+  overlay: {
+    setIgnoreMouseEvents: (ignore: boolean): Promise<void> =>
+      ipcRenderer.invoke('overlay:setIgnoreMouseEvents', ignore),
+    savePosition: (): Promise<void> =>
+      ipcRenderer.invoke('overlay:savePosition')
+  }
 })

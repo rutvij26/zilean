@@ -14,7 +14,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   eventCoachingSensitivity: 'major',
   showLiveStats: true,
   showEventFeed: true,
-  showMatchupTip: true
+  showMatchupTip: true,
+  overlayX: undefined,
+  overlayY: undefined
 }
 
 function getSettingsPath(): string {
