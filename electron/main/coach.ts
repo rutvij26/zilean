@@ -1,8 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { GameState, CoachingGoals, ChampionContext } from '../../shared/types'
+import { GameState, CoachingGoals, ChampionContext, AppSettings } from '../../shared/types'
 
-const DEFAULT_MODEL = 'claude-sonnet-4-6'
+const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-6'
+const DEFAULT_PERPLEXITY_MODEL = 'sonar'
 const MAX_TOKENS = 700
+
+const SYSTEM_PROMPT =
+  'You are an expert League of Legends coach. Analyze live game state and generate short actionable goals. Take recent events seriously — a Baron kill or team fight loss changes priorities immediately.'
 
 function formatChampCompact(c: ChampionContext): string {
   return `${c.championName}(${c.level})`
@@ -161,29 +165,14 @@ function validateCoachingGoals(obj: unknown): CoachingGoals {
   return result
 }
 
-export async function generateCoaching(
-  state: GameState,
-  historicalContext?: string,
-  aiModel?: string
-): Promise<CoachingGoals> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY is not set')
-  }
-
-  const model = aiModel ?? DEFAULT_MODEL
+export async function callClaude(prompt: string, model: string, apiKey: string): Promise<CoachingGoals> {
   const client = new Anthropic({ apiKey })
 
   const message = await client.messages.create({
     model,
     max_tokens: MAX_TOKENS,
-    system: `You are an expert League of Legends coach. Analyze live game state and generate short actionable goals. Take recent events seriously — a Baron kill or team fight loss changes priorities immediately.`,
-    messages: [
-      {
-        role: 'user',
-        content: buildPrompt(state, historicalContext)
-      }
-    ]
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: prompt }]
   })
 
   const content = message.content[0]
@@ -192,8 +181,6 @@ export async function generateCoaching(
   }
 
   const text = content.text.trim()
-
-  // Strip markdown code fences if present
   const jsonText = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
 
   let parsed: unknown
@@ -204,4 +191,72 @@ export async function generateCoaching(
   }
 
   return validateCoachingGoals(parsed)
+}
+
+export async function callPerplexity(prompt: string, model: string, apiKey: string): Promise<CoachingGoals> {
+  const response = await fetch('https://api.perplexity.ai/chat/completions', {
+    method: 'POST',
+    signal: AbortSignal.timeout(15_000),
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: MAX_TOKENS
+    })
+  })
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => response.statusText)
+    throw new Error(`Perplexity API error ${response.status}: ${errText.slice(0, 200)}`)
+  }
+
+  const data = await response.json() as { choices: Array<{ message: { content: string } }> }
+  const text = data.choices?.[0]?.message?.content?.trim()
+  if (!text) {
+    throw new Error('Empty response from Perplexity')
+  }
+
+  const jsonText = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(jsonText)
+  } catch {
+    throw new Error(`Perplexity returned non-JSON response: ${text.slice(0, 200)}`)
+  }
+
+  return validateCoachingGoals(parsed)
+}
+
+type CoachingSettingsParam = Pick<AppSettings, 'aiProvider' | 'aiModel' | 'perplexityModel' | 'perplexityApiKey'>
+
+export async function generateCoaching(
+  state: GameState,
+  historicalContext?: string,
+  settings?: Partial<CoachingSettingsParam>
+): Promise<CoachingGoals> {
+  const provider = settings?.aiProvider ?? 'claude'
+  const prompt = buildPrompt(state, historicalContext)
+
+  if (provider === 'perplexity') {
+    const apiKey = settings?.perplexityApiKey || process.env.PERPLEXITY_API_KEY
+    if (!apiKey) {
+      throw new Error('PERPLEXITY_API_KEY is not set')
+    }
+    const model = settings?.perplexityModel ?? DEFAULT_PERPLEXITY_MODEL
+    return callPerplexity(prompt, model, apiKey)
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY is not set')
+  }
+  const model = settings?.aiModel ?? DEFAULT_CLAUDE_MODEL
+  return callClaude(prompt, model, apiKey)
 }

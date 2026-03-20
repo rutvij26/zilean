@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { GameState, CoachingGoals } from '../shared/types'
+import type { GameState, CoachingGoals, AppSettings } from '../shared/types'
 
 // Mock @anthropic-ai/sdk before importing coach
 vi.mock('@anthropic-ai/sdk', () => {
@@ -62,8 +62,10 @@ const validResponse: CoachingGoals = {
   matchupTip: 'Poke Ahri before she hits six to deny roam pressure.'
 }
 
+type CoachingSettingsParam = Partial<Pick<AppSettings, 'aiProvider' | 'aiModel' | 'perplexityModel' | 'perplexityApiKey'>>
+
 describe('generateCoaching', () => {
-  let generateCoaching: (state: GameState, ctx?: string, aiModel?: string) => Promise<CoachingGoals>
+  let generateCoaching: (state: GameState, ctx?: string, settings?: CoachingSettingsParam) => Promise<CoachingGoals>
   let mockCreate: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
@@ -83,7 +85,9 @@ describe('generateCoaching', () => {
 
   afterEach(() => {
     delete process.env.ANTHROPIC_API_KEY
+    delete process.env.PERPLEXITY_API_KEY
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('returns CoachingGoals shape on valid response', async () => {
@@ -283,7 +287,7 @@ describe('generateCoaching', () => {
       content: [{ type: 'text', text: JSON.stringify(validResponse) }]
     })
 
-    await generateCoaching(mockGameState, undefined, 'claude-haiku-4-5-20251001')
+    await generateCoaching(mockGameState, undefined, { aiModel: 'claude-haiku-4-5-20251001' })
 
     const callArgs = mockCreate.mock.calls[0][0]
     expect(callArgs.model).toBe('claude-haiku-4-5-20251001')
@@ -334,5 +338,191 @@ describe('generateCoaching', () => {
     const userContent = callArgs.messages[0].content
     expect(userContent).toContain('Enemy team took Fire Dragon')
     expect(userContent).not.toContain('DragonKill')
+  })
+})
+
+describe('callPerplexity', () => {
+  let callPerplexity: (prompt: string, model: string, apiKey: string) => Promise<CoachingGoals>
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const coachModule = await import('../electron/main/coach')
+    callPerplexity = coachModule.callPerplexity
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('returns CoachingGoals on valid Perplexity response', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: JSON.stringify(validResponse) } }]
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const result = await callPerplexity('test prompt', 'sonar', 'pplx-test-key')
+    expect(result).toMatchObject({
+      personalGoals: expect.any(Array),
+      teamGoals: expect.any(Array),
+      gamePhase: expect.stringMatching(/^(early|mid|late)$/),
+      matchupTip: expect.any(String)
+    })
+  })
+
+  it('sends correct request to Perplexity API', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: JSON.stringify(validResponse) } }]
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    await callPerplexity('test prompt', 'sonar-pro', 'pplx-test-key')
+
+    const [url, options] = mockFetch.mock.calls[0]
+    expect(url).toBe('https://api.perplexity.ai/chat/completions')
+    expect(options.method).toBe('POST')
+    expect(options.headers['Authorization']).toBe('Bearer pplx-test-key')
+    expect(options.headers['Content-Type']).toBe('application/json')
+
+    const body = JSON.parse(options.body)
+    expect(body.model).toBe('sonar-pro')
+    expect(body.messages[0].role).toBe('system')
+    expect(body.messages[1].role).toBe('user')
+    expect(body.messages[1].content).toBe('test prompt')
+  })
+
+  it('throws on non-2xx Perplexity response', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      text: () => Promise.resolve('Invalid API key')
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    await expect(callPerplexity('test prompt', 'sonar', 'bad-key')).rejects.toThrow('Perplexity API error 401')
+  })
+
+  it('throws on non-JSON Perplexity response', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Sure! Here are your coaching goals...' } }]
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    await expect(callPerplexity('test prompt', 'sonar', 'pplx-test-key')).rejects.toThrow('non-JSON')
+  })
+
+  it('throws on empty Perplexity response', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ choices: [] })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    await expect(callPerplexity('test prompt', 'sonar', 'pplx-test-key')).rejects.toThrow('Empty response')
+  })
+
+  it('strips markdown code fences from Perplexity response', async () => {
+    const wrapped = `\`\`\`json\n${JSON.stringify(validResponse)}\n\`\`\``
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: wrapped } }]
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const result = await callPerplexity('test prompt', 'sonar', 'pplx-test-key')
+    expect(result.personalGoals.length).toBe(2)
+  })
+})
+
+describe('generateCoaching — Perplexity provider', () => {
+  let generateCoaching: (state: GameState, ctx?: string, settings?: CoachingSettingsParam) => Promise<CoachingGoals>
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const coachModule = await import('../electron/main/coach')
+    generateCoaching = coachModule.generateCoaching
+  })
+
+  afterEach(() => {
+    delete process.env.PERPLEXITY_API_KEY
+    vi.clearAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('routes to Perplexity when aiProvider is perplexity', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: JSON.stringify(validResponse) } }]
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const result = await generateCoaching(mockGameState, undefined, {
+      aiProvider: 'perplexity',
+      perplexityModel: 'sonar-pro',
+      perplexityApiKey: 'pplx-test-key'
+    })
+
+    expect(result).toMatchObject({ personalGoals: expect.any(Array) })
+    expect(mockFetch).toHaveBeenCalledOnce()
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+    expect(body.model).toBe('sonar-pro')
+  })
+
+  it('throws when PERPLEXITY_API_KEY is not set and not in settings', async () => {
+    await expect(generateCoaching(mockGameState, undefined, {
+      aiProvider: 'perplexity'
+    })).rejects.toThrow('PERPLEXITY_API_KEY')
+  })
+
+  it('reads PERPLEXITY_API_KEY from env when not in settings', async () => {
+    process.env.PERPLEXITY_API_KEY = 'pplx-env-key'
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: JSON.stringify(validResponse) } }]
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const result = await generateCoaching(mockGameState, undefined, {
+      aiProvider: 'perplexity',
+      perplexityModel: 'sonar'
+    })
+
+    expect(result).toMatchObject({ personalGoals: expect.any(Array) })
+    const [, options] = mockFetch.mock.calls[0]
+    expect(options.headers['Authorization']).toBe('Bearer pplx-env-key')
+  })
+
+  it('defaults to sonar model when perplexityModel not specified', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: JSON.stringify(validResponse) } }]
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    await generateCoaching(mockGameState, undefined, {
+      aiProvider: 'perplexity',
+      perplexityApiKey: 'pplx-test-key'
+    })
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+    expect(body.model).toBe('sonar')
   })
 })

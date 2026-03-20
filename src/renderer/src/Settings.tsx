@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { AppSettings } from '../../../shared/types'
 import './styles/main.css'
 
-const MODEL_OPTIONS = [
+const CLAUDE_MODEL_OPTIONS = [
   {
     id: 'claude-haiku-4-5-20251001',
     label: 'Haiku 4.5',
@@ -26,6 +26,30 @@ const MODEL_OPTIONS = [
   }
 ]
 
+const PERPLEXITY_MODEL_OPTIONS = [
+  {
+    id: 'sonar',
+    label: 'Sonar',
+    desc: 'Fast, cheap',
+    cost: '~$0.02/game',
+    badge: '⚡'
+  },
+  {
+    id: 'sonar-pro',
+    label: 'Sonar Pro',
+    desc: 'Best quality',
+    cost: '~$0.10/game',
+    badge: '★'
+  },
+  {
+    id: 'sonar-reasoning',
+    label: 'Sonar Reasoning',
+    desc: 'Chain-of-thought',
+    cost: '~$0.20/game',
+    badge: '🧠'
+  }
+]
+
 const INTERVAL_OPTIONS = [
   { value: 60, label: 'Every 60s' },
   { value: 90, label: 'Every 90s' },
@@ -34,12 +58,19 @@ const INTERVAL_OPTIONS = [
   { value: 300, label: 'Every 5 min' }
 ]
 
+function maskKey(key: string): string {
+  return key ? '••••••••' + key.slice(-4) : ''
+}
+
 const DEFAULT_SETTINGS: AppSettings = {
   anthropicApiKey: '',
   overlayVisible: true,
   summonerName: '',
   overlayTheme: 'lol-native',
+  aiProvider: 'claude',
   aiModel: 'claude-sonnet-4-6',
+  perplexityApiKey: '',
+  perplexityModel: 'sonar',
   coachingIntervalSecs: 90,
   eventCoachingEnabled: true,
   eventCoachingSensitivity: 'major',
@@ -53,6 +84,7 @@ export function Settings({ onSaved }: { onSaved?: (settings: AppSettings) => voi
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
   const [saved, setSaved] = useState(false)
   const [apiKeyInput, setApiKeyInput] = useState('')
+  const [perplexityKeyInput, setPerplexityKeyInput] = useState('')
 
   useEffect(() => {
     window.electronAPI?.getSettings().then((s) => {
@@ -60,15 +92,21 @@ export function Settings({ onSaved }: { onSaved?: (settings: AppSettings) => voi
       if (s.anthropicApiKey) {
         setApiKeyInput('••••••••' + s.anthropicApiKey.slice(-4))
       }
+      if (s.perplexityApiKey) {
+        setPerplexityKeyInput('••••••••' + s.perplexityApiKey.slice(-4))
+      }
     })
   }, [])
 
   function handleSave(): void {
     const updated: AppSettings = {
       ...settings,
-      anthropicApiKey: apiKeyInput.startsWith('••••')
+      anthropicApiKey: apiKeyInput === maskKey(settings.anthropicApiKey)
         ? settings.anthropicApiKey
-        : apiKeyInput
+        : apiKeyInput,
+      perplexityApiKey: perplexityKeyInput === maskKey(settings.perplexityApiKey)
+        ? settings.perplexityApiKey
+        : perplexityKeyInput
     }
     window.electronAPI?.saveSettings(updated).then(() => {
       setSettings(updated)
@@ -78,43 +116,118 @@ export function Settings({ onSaved }: { onSaved?: (settings: AppSettings) => voi
     })
   }
 
+  const isPerplexity = settings.aiProvider === 'perplexity'
+
   return (
     <div className="settings-page">
 
       <div className="settings-group">
-        <label>Anthropic API Key</label>
-        <input
-          type="password"
-          value={apiKeyInput}
-          onChange={(e) => setApiKeyInput(e.target.value)}
-          placeholder="sk-ant-..."
-          className="settings-input"
-        />
-      </div>
-
-      <div className="settings-group">
-        <label>AI Model</label>
+        <label>AI Provider</label>
         <div className="model-picker">
-          {MODEL_OPTIONS.map((m) => (
-            <label
-              key={m.id}
-              className={`model-option${settings.aiModel === m.id ? ' model-option--selected' : ''}`}
-            >
-              <input
-                type="radio"
-                name="aiModel"
-                value={m.id}
-                checked={settings.aiModel === m.id}
-                onChange={() => setSettings({ ...settings, aiModel: m.id })}
-              />
-              <span className="model-badge">{m.badge}</span>
-              <span className="model-label">{m.label}</span>
-              <span className="model-desc">{m.desc}</span>
-              <span className="model-cost">{m.cost}</span>
-            </label>
-          ))}
+          <label className={`model-option${!isPerplexity ? ' model-option--selected' : ''}`}>
+            <input
+              type="radio"
+              name="aiProvider"
+              value="claude"
+              checked={!isPerplexity}
+              onChange={() => {
+                setSettings({ ...settings, aiProvider: 'claude' })
+                setPerplexityKeyInput(maskKey(settings.perplexityApiKey))
+              }}
+            />
+            <span className="model-label">Claude (Anthropic)</span>
+            <span className="model-desc">Sonnet · Haiku · Opus</span>
+          </label>
+          <label className={`model-option${isPerplexity ? ' model-option--selected' : ''}`}>
+            <input
+              type="radio"
+              name="aiProvider"
+              value="perplexity"
+              checked={isPerplexity}
+              onChange={() => {
+                setSettings({ ...settings, aiProvider: 'perplexity' })
+                setApiKeyInput(maskKey(settings.anthropicApiKey))
+              }}
+            />
+            <span className="model-label">Perplexity</span>
+            <span className="model-desc">Sonar · Pro · Reasoning</span>
+          </label>
         </div>
       </div>
+
+      {!isPerplexity ? (
+        <div className="settings-group">
+          <label>Anthropic API Key</label>
+          <input
+            type="password"
+            value={apiKeyInput}
+            onChange={(e) => setApiKeyInput(e.target.value)}
+            placeholder="sk-ant-..."
+            className="settings-input"
+          />
+        </div>
+      ) : (
+        <div className="settings-group">
+          <label>Perplexity API Key</label>
+          <input
+            type="password"
+            value={perplexityKeyInput}
+            onChange={(e) => setPerplexityKeyInput(e.target.value)}
+            placeholder="pplx-..."
+            className="settings-input"
+          />
+        </div>
+      )}
+
+      {!isPerplexity ? (
+        <div className="settings-group">
+          <label>AI Model</label>
+          <div className="model-picker">
+            {CLAUDE_MODEL_OPTIONS.map((m) => (
+              <label
+                key={m.id}
+                className={`model-option${settings.aiModel === m.id ? ' model-option--selected' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="aiModel"
+                  value={m.id}
+                  checked={settings.aiModel === m.id}
+                  onChange={() => setSettings({ ...settings, aiModel: m.id })}
+                />
+                <span className="model-badge">{m.badge}</span>
+                <span className="model-label">{m.label}</span>
+                <span className="model-desc">{m.desc}</span>
+                <span className="model-cost">{m.cost}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="settings-group">
+          <label>AI Model</label>
+          <div className="model-picker">
+            {PERPLEXITY_MODEL_OPTIONS.map((m) => (
+              <label
+                key={m.id}
+                className={`model-option${settings.perplexityModel === m.id ? ' model-option--selected' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="perplexityModel"
+                  value={m.id}
+                  checked={settings.perplexityModel === m.id}
+                  onChange={() => setSettings({ ...settings, perplexityModel: m.id })}
+                />
+                <span className="model-badge">{m.badge}</span>
+                <span className="model-label">{m.label}</span>
+                <span className="model-desc">{m.desc}</span>
+                <span className="model-cost">{m.cost}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="settings-group">
         <label>Coaching Frequency</label>

@@ -289,7 +289,12 @@ async function handleGameState(gameState: GameState | null): Promise<void> {
     const goals = await generateCoaching(
       gameState,
       undefined,
-      runtimeSettings.aiModel
+      {
+        aiProvider: runtimeSettings.aiProvider,
+        aiModel: runtimeSettings.aiModel,
+        perplexityModel: runtimeSettings.perplexityModel,
+        perplexityApiKey: runtimeSettings.perplexityApiKey
+      }
     )
     cachedGoals = goals
     lastCoachTime = Date.now()
@@ -319,10 +324,12 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('get-settings', () => loadSettings())
 
-  ipcMain.handle('save-settings', (_event, settings) => {
+  ipcMain.handle('save-settings', (_event, incoming: AppSettings) => {
+    // Merge with current runtime settings so any missing fields fall back to known-good values
+    const settings: AppSettings = { ...runtimeSettings, ...incoming }
     saveSettings(settings)
     runtimeSettings = settings
-    // Apply API key immediately if provided
+    // Apply Anthropic API key to env for the Claude path (reads from process.env)
     if (settings.anthropicApiKey) {
       process.env.ANTHROPIC_API_KEY = settings.anthropicApiKey
     }

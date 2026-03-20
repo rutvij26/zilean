@@ -158,7 +158,10 @@ export interface AppSettings {
   overlayVisible: boolean
   summonerName?: string
   overlayTheme: 'lol-native' | 'minimal' | 'sidebar'
+  aiProvider: 'claude' | 'perplexity'    // default: 'claude'
   aiModel: string                        // claude-haiku-4-5-20251001 | claude-sonnet-4-6 | claude-opus-4-6
+  perplexityApiKey: string               // default: ''
+  perplexityModel: string                // sonar | sonar-pro | sonar-reasoning
   coachingIntervalSecs: number           // 60 | 90 | 120 | 180 | 300
   eventCoachingEnabled: boolean
   eventCoachingSensitivity: 'major' | 'all'  // major = baron/dragon/inhib; all = + kills
