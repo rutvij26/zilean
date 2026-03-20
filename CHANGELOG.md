@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/rutvij26/zilean/compare/v1.3.0...v1.4.0) (2026-03-20)
+
+
+### Features
+
+* add Perplexity as selectable AI provider ([8ebd8e2](https://github.com/rutvij26/zilean/commit/8ebd8e2a647422f9c02aff34c52b168431cb2519))
+
 # [1.3.0](https://github.com/rutvij26/zilean/compare/v1.2.0...v1.3.0) (2026-03-19)
 
 
